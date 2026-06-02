@@ -1,0 +1,380 @@
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans)}
+.app{padding:1rem 0;max-width:660px}
+.header{display:flex;align-items:center;gap:12px;margin-bottom:1.5rem}
+.badge{font-size:12px;padding:4px 10px;border-radius:var(--border-radius-md);font-weight:500}
+.badge-q{background:var(--color-background-info);color:var(--color-text-info)}
+.badge-c{background:var(--color-background-success);color:var(--color-text-success)}
+.badge-r{background:var(--color-background-warning);color:var(--color-text-warning)}
+.progress-bar{height:6px;background:var(--color-border-tertiary);border-radius:3px;margin-bottom:1.5rem;overflow:hidden}
+.progress-fill{height:100%;background:var(--color-text-info);border-radius:3px;transition:width 0.4s}
+.card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1.25rem;margin-bottom:1rem}
+.q-meta{font-size:12px;color:var(--color-text-secondary);margin-bottom:0.5rem}
+.q-text{font-size:15px;color:var(--color-text-primary);margin-bottom:1rem;line-height:1.6}
+.canvas-wrap{margin-bottom:1rem;text-align:center}
+canvas{border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary)}
+.options{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.opt{background:var(--color-background-secondary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:10px 14px;font-size:14px;color:var(--color-text-primary);cursor:pointer;text-align:left;transition:background 0.15s,border-color 0.15s}
+.opt:hover{background:var(--color-background-info);border-color:var(--color-border-info);color:var(--color-text-info)}
+.opt.correct{background:var(--color-background-success);border-color:var(--color-border-success);color:var(--color-text-success);font-weight:500}
+.opt.wrong{background:var(--color-background-danger);border-color:var(--color-border-danger);color:var(--color-text-danger)}
+.opt.disabled{pointer-events:none;opacity:0.6}
+.opt.show-correct{background:var(--color-background-success);border-color:var(--color-border-success);color:var(--color-text-success)}
+.feedback{margin-top:0.75rem;padding:10px 14px;border-radius:var(--border-radius-md);font-size:14px;line-height:1.5;display:none}
+.feedback.ok{background:var(--color-background-success);color:var(--color-text-success)}
+.feedback.fail{background:var(--color-background-danger);color:var(--color-text-danger)}
+.nav{display:flex;justify-content:space-between;align-items:center;margin-top:1rem}
+.btn{border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:8px 18px;font-size:14px;cursor:pointer;background:transparent;color:var(--color-text-primary)}
+.btn:hover{background:var(--color-background-secondary)}
+.btn-next{background:var(--color-background-info);border-color:var(--color-border-info);color:var(--color-text-info)}
+.btn-next:hover{opacity:0.85}
+.btn:disabled{opacity:0.35;pointer-events:none}
+.score-card{text-align:center;padding:2rem 1rem}
+.score-num{font-size:48px;font-weight:500;color:var(--color-text-primary);margin-bottom:0.5rem}
+.score-label{font-size:15px;color:var(--color-text-secondary);margin-bottom:1.5rem}
+.score-detail{font-size:13px;color:var(--color-text-secondary);margin-bottom:1.5rem}
+.counter{font-size:13px;color:var(--color-text-secondary)}
+</style>
+
+<div class="app" id="app"></div>
+
+<script>
+const preguntas = [
+  {
+    tipo: "cuadrática",
+    texto: "Observa la parábola. ¿Cuál es el vértice de esta función cuadrática?",
+    grafica: (ctx, W, H) => {
+      ctx.clearRect(0,0,W,H);
+      dibujarEjes(ctx,W,H);
+      ctx.strokeStyle="#185FA5"; ctx.lineWidth=2.5;
+      ctx.beginPath();
+      for(let px=0;px<W;px++){
+        const x=pxToX(px,W), y=(x-1)**2-2;
+        const py=yToPx(y,H);
+        px===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+      ctx.fillStyle="#D85A30"; ctx.beginPath();
+      ctx.arc(xToPx(1,W),yToPx(-2,H),5,0,2*Math.PI); ctx.fill();
+    },
+    opciones:["(1, −2)","(0, 1)","(−1, 2)","(2, 0)"],
+    correcta:0,
+    explicacion:"El vértice es el punto más bajo de la parábola. En f(x) = (x−1)²−2, el vértice es (1, −2)."
+  },
+  {
+    tipo: "cuadrática",
+    texto: "¿Hacia qué lado abre la parábola y qué indica eso sobre el coeficiente a?",
+    grafica: (ctx, W, H) => {
+      ctx.clearRect(0,0,W,H);
+      dibujarEjes(ctx,W,H);
+      ctx.strokeStyle="#185FA5"; ctx.lineWidth=2.5;
+      ctx.beginPath();
+      for(let px=0;px<W;px++){
+        const x=pxToX(px,W), y=-0.5*(x+1)**2+3;
+        const py=yToPx(y,H);
+        px===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+    },
+    opciones:["Abre hacia arriba, a > 0","Abre hacia abajo, a < 0","No abre, a = 0","Abre hacia la derecha, a > 0"],
+    correcta:1,
+    explicacion:"La parábola abre hacia abajo, lo que indica que el coeficiente a es negativo (a < 0). Aquí a = −0.5."
+  },
+  {
+    tipo: "cuadrática",
+    texto: "¿Cuántas raíces reales tiene la función cuadrática de la gráfica?",
+    grafica: (ctx, W, H) => {
+      ctx.clearRect(0,0,W,H);
+      dibujarEjes(ctx,W,H);
+      ctx.strokeStyle="#185FA5"; ctx.lineWidth=2.5;
+      ctx.beginPath();
+      for(let px=0;px<W;px++){
+        const x=pxToX(px,W), y=x**2+1;
+        const py=yToPx(y,H);
+        px===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+    },
+    opciones:["Dos raíces reales","Una raíz real","Ninguna raíz real","Tres raíces reales"],
+    correcta:2,
+    explicacion:"La parábola f(x) = x²+1 siempre es positiva y nunca corta el eje x, por lo tanto no tiene raíces reales."
+  },
+  {
+    tipo: "cuadrática",
+    texto: "¿Cuál es el eje de simetría de la parábola de la gráfica?",
+    grafica: (ctx, W, H) => {
+      ctx.clearRect(0,0,W,H);
+      dibujarEjes(ctx,W,H);
+      ctx.strokeStyle="#185FA5"; ctx.lineWidth=2.5;
+      ctx.beginPath();
+      for(let px=0;px<W;px++){
+        const x=pxToX(px,W), y=(x+2)**2-1;
+        const py=yToPx(y,H);
+        px===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+      ctx.setLineDash([5,5]); ctx.strokeStyle="#888"; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(xToPx(-2,W),0); ctx.lineTo(xToPx(-2,W),H); ctx.stroke();
+      ctx.setLineDash([]);
+    },
+    opciones:["x = 2","x = −1","x = −2","x = 0"],
+    correcta:2,
+    explicacion:"El eje de simetría pasa por el vértice. En f(x) = (x+2)²−1, el vértice está en (−2, −1), por tanto x = −2."
+  },
+  {
+    tipo: "cúbica",
+    texto: "¿Cuál es el comportamiento de esta función cúbica cuando x → +∞?",
+    grafica: (ctx, W, H) => {
+      ctx.clearRect(0,0,W,H);
+      dibujarEjes(ctx,W,H);
+      ctx.strokeStyle="#0F6E56"; ctx.lineWidth=2.5;
+      ctx.beginPath();
+      for(let px=0;px<W;px++){
+        const x=pxToX(px,W), y=x**3;
+        const py=yToPx(y,H);
+        if(px===0)ctx.moveTo(px,py); else ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+    },
+    opciones:["f(x) → +∞","f(x) → −∞","f(x) → 0","f(x) → 1"],
+    correcta:0,
+    explicacion:"Para f(x) = x³, cuando x tiende a +∞, la función también tiende a +∞. La cúbica sube sin límite hacia la derecha."
+  },
+  {
+    tipo: "cúbica",
+    texto: "¿Cuántas veces corta al eje x esta función cúbica?",
+    grafica: (ctx, W, H) => {
+      ctx.clearRect(0,0,W,H);
+      dibujarEjes(ctx,W,H);
+      ctx.strokeStyle="#0F6E56"; ctx.lineWidth=2.5;
+      ctx.beginPath();
+      for(let px=0;px<W;px++){
+        const x=pxToX(px,W), y=(x-2)*x*(x+2)/4;
+        const py=yToPx(y,H);
+        px===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+      [[-2,0],[0,0],[2,0]].forEach(([cx,cy])=>{
+        ctx.fillStyle="#D85A30";ctx.beginPath();
+        ctx.arc(xToPx(cx,W),yToPx(cy,H),5,0,2*Math.PI);ctx.fill();
+      });
+    },
+    opciones:["Una vez","Dos veces","Tres veces","No corta el eje"],
+    correcta:2,
+    explicacion:"La función f(x) = x(x−2)(x+2)/4 tiene tres raíces reales: x = −2, x = 0 y x = 2. Corta el eje x en tres puntos."
+  },
+  {
+    tipo: "cúbica",
+    texto: "Esta función cúbica tiene coeficiente líder negativo. ¿Cuál gráfica la representa mejor?",
+    grafica: null,
+    texto2: "f(x) = −x³ + 2x",
+    opciones:["Sube a la izquierda, baja a la derecha","Baja a la izquierda, sube a la derecha","Sube en ambos lados","Baja en ambos lados"],
+    correcta:0,
+    explicacion:"Con coeficiente líder negativo (a < 0) en una cúbica, la función sube hacia la izquierda (x → −∞) y baja hacia la derecha (x → +∞)."
+  },
+  {
+    tipo: "racional",
+    texto: "¿Dónde está la asíntota vertical de esta función racional?",
+    grafica: (ctx, W, H) => {
+      ctx.clearRect(0,0,W,H);
+      dibujarEjes(ctx,W,H);
+      ctx.setLineDash([5,5]); ctx.strokeStyle="#BA7517"; ctx.lineWidth=1.2;
+      ctx.beginPath(); ctx.moveTo(xToPx(2,W),0); ctx.lineTo(xToPx(2,W),H); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle="#854F0B"; ctx.lineWidth=2.5;
+      for(let lado=0;lado<2;lado++){
+        ctx.beginPath();
+        let first=true;
+        for(let px=0;px<W;px++){
+          const x=pxToX(px,W);
+          if(lado===0&&x>=1.97)continue;
+          if(lado===1&&x<=2.03)continue;
+          const y=1/(x-2);
+          const py=yToPx(y,H);
+          if(py<-5||py>H+5){first=true;continue;}
+          first?(ctx.moveTo(px,py),first=false):ctx.lineTo(px,py);
+        }
+        ctx.stroke();
+      }
+    },
+    opciones:["x = 2","x = 0","y = 2","y = 0"],
+    correcta:0,
+    explicacion:"La asíntota vertical ocurre donde el denominador se hace cero. En f(x) = 1/(x−2), el denominador es cero cuando x = 2."
+  },
+  {
+    tipo: "racional",
+    texto: "¿Cuál es la asíntota horizontal de la función f(x) = 3/(x+1)?",
+    grafica: (ctx, W, H) => {
+      ctx.clearRect(0,0,W,H);
+      dibujarEjes(ctx,W,H);
+      ctx.setLineDash([5,5]); ctx.strokeStyle="#BA7517"; ctx.lineWidth=1.2;
+      ctx.beginPath(); ctx.moveTo(0,yToPx(0,H)); ctx.lineTo(W,yToPx(0,H)); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle="#854F0B"; ctx.lineWidth=2.5;
+      for(let lado=0;lado<2;lado++){
+        ctx.beginPath(); let first=true;
+        for(let px=0;px<W;px++){
+          const x=pxToX(px,W);
+          if(lado===0&&x>=-1.03)continue;
+          if(lado===1&&x<=-0.97)continue;
+          const y=3/(x+1);
+          const py=yToPx(y,H);
+          if(py<-5||py>H+5){first=true;continue;}
+          first?(ctx.moveTo(px,py),first=false):ctx.lineTo(px,py);
+        }
+        ctx.stroke();
+      }
+    },
+    opciones:["y = 0","y = 3","y = 1","y = −1"],
+    correcta:0,
+    explicacion:"Cuando x → ±∞, el término 3/(x+1) tiende a 0. Por eso la asíntota horizontal es y = 0 (el eje x)."
+  },
+  {
+    tipo: "racional",
+    texto: "¿En qué valor de x no está definida la función f(x) = 5/(x²−4)?",
+    grafica: (ctx, W, H) => {
+      ctx.clearRect(0,0,W,H);
+      dibujarEjes(ctx,W,H);
+      [-2,2].forEach(av=>{
+        ctx.setLineDash([5,5]); ctx.strokeStyle="#BA7517"; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(xToPx(av,W),0); ctx.lineTo(xToPx(av,W),H); ctx.stroke();
+        ctx.setLineDash([]);
+      });
+      ctx.strokeStyle="#854F0B"; ctx.lineWidth=2;
+      const zonas=[[-5,-2.05],[-1.95,1.95],[2.05,5]];
+      zonas.forEach(([xi,xf])=>{
+        ctx.beginPath(); let first=true;
+        for(let px=0;px<W;px++){
+          const x=pxToX(px,W);
+          if(x<xi||x>xf){first=true;continue;}
+          const y=5/(x**2-4);
+          const py=yToPx(y,H);
+          if(py<-5||py>H+5){first=true;continue;}
+          first?(ctx.moveTo(px,py),first=false):ctx.lineTo(px,py);
+        }
+        ctx.stroke();
+      });
+    },
+    opciones:["x = 2 y x = −2","x = 4 y x = −4","Solo x = 2","x = 0"],
+    correcta:0,
+    explicacion:"x²−4 = (x−2)(x+2) = 0 cuando x = 2 o x = −2. En esos valores la función no está definida y hay asíntotas verticales."
+  }
+];
+
+const W=300, H=200, escX=30, escY=30;
+function pxToX(px,W){return (px-W/2)/escX;}
+function xToPx(x,W){return x*escX+W/2;}
+function yToPx(y,H){return H/2-y*escY;}
+
+function dibujarEjes(ctx,W,H){
+  const isDark=getComputedStyle(document.body).getPropertyValue('--color-text-primary').trim().startsWith('#f')||
+    window.matchMedia('(prefers-color-scheme:dark)').matches;
+  const axisColor=isDark?'rgba(255,255,255,0.25)':'rgba(0,0,0,0.18)';
+  const gridColor=isDark?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.05)';
+  ctx.strokeStyle=gridColor; ctx.lineWidth=0.5;
+  for(let x=-Math.ceil(W/2/escX);x<=Math.ceil(W/2/escX);x++){
+    ctx.beginPath(); ctx.moveTo(xToPx(x,W),0); ctx.lineTo(xToPx(x,W),H); ctx.stroke();
+  }
+  for(let y=-Math.ceil(H/2/escY);y<=Math.ceil(H/2/escY);y++){
+    ctx.beginPath(); ctx.moveTo(0,yToPx(y,H)); ctx.lineTo(W,yToPx(y,H)); ctx.stroke();
+  }
+  ctx.strokeStyle=axisColor; ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+  ctx.fillStyle=axisColor; ctx.font='9px var(--font-sans)'; ctx.textAlign='center';
+  for(let x=-4;x<=4;x++){
+    if(x===0)continue;
+    ctx.fillText(x,xToPx(x,W),H/2+11);
+  }
+  ctx.textAlign='right';
+  for(let y=-3;y<=3;y++){
+    if(y===0)continue;
+    ctx.fillText(y,W/2-4,yToPx(y,H)+4);
+  }
+}
+
+let actual=0, correctas=0, respondida=false;
+const colores={cuadrática:'badge-q',cúbica:'badge-c',racional:'badge-r'};
+const etiquetas={cuadrática:'Función cuadrática',cúbica:'Función cúbica',racional:'Función racional'};
+
+function render(){
+  const app=document.getElementById('app');
+  if(actual>=preguntas.length){
+    const pct=Math.round(correctas/preguntas.length*100);
+    const msg=pct>=80?'¡Excelente trabajo!':pct>=50?'Buen esfuerzo, sigue practicando.':'Repasa los conceptos e intenta de nuevo.';
+    app.innerHTML=`
+      <div class="card score-card">
+        <div class="score-num">${correctas}/${preguntas.length}</div>
+        <div class="score-label">${pct}% de respuestas correctas</div>
+        <div class="score-detail">${msg}</div>
+        <button class="btn btn-next" onclick="reiniciar()">Intentar de nuevo</button>
+      </div>`;
+    return;
+  }
+  const q=preguntas[actual];
+  const pct=Math.round(actual/preguntas.length*100);
+  app.innerHTML=`
+    <div class="header">
+      <span class="badge ${colores[q.tipo]}">${etiquetas[q.tipo]}</span>
+      <span class="counter">Pregunta ${actual+1} de ${preguntas.length}</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+    <div class="card">
+      <div class="q-meta">Pregunta ${actual+1}</div>
+      <div class="q-text">${q.texto}${q.texto2?`<br><strong style="font-size:16px">${q.texto2}</strong>`:''}</div>
+      ${q.grafica?`<div class="canvas-wrap"><canvas id="cv" width="${W}" height="${H}"></canvas></div>`:''}
+      <div class="options" id="opts">
+        ${q.opciones.map((o,i)=>`<button class="opt" data-i="${i}" onclick="responder(${i})">${o}</button>`).join('')}
+      </div>
+      <div class="feedback" id="fb"></div>
+      <div class="nav">
+        <span></span>
+        <button class="btn btn-next" id="btnNext" style="display:none" onclick="siguiente()">
+          ${actual+1<preguntas.length?'Siguiente →':'Ver resultado'}
+        </button>
+      </div>
+    </div>`;
+  if(q.grafica){
+    const cv=document.getElementById('cv');
+    const ctx=cv.getContext('2d');
+    q.grafica(ctx,W,H);
+  }
+}
+
+function responder(i){
+  if(respondida)return;
+  respondida=true;
+  const q=preguntas[actual];
+  const opts=document.querySelectorAll('.opt');
+  opts.forEach(o=>o.classList.add('disabled'));
+  const fb=document.getElementById('fb');
+  if(i===q.correcta){
+    correctas++;
+    opts[i].classList.add('correct');
+    fb.className='feedback ok';
+    fb.innerHTML='<strong>¡Correcto!</strong> '+q.explicacion;
+  } else {
+    opts[i].classList.add('wrong');
+    opts[q.correcta].classList.remove('disabled');
+    opts[q.correcta].classList.add('show-correct');
+    fb.className='feedback fail';
+    fb.innerHTML='<strong>No es correcto.</strong> '+q.explicacion;
+  }
+  fb.style.display='block';
+  document.getElementById('btnNext').style.display='inline-block';
+}
+
+function siguiente(){
+  actual++;
+  respondida=false;
+  render();
+}
+
+function reiniciar(){
+  actual=0; correctas=0; respondida=false;
+  render();
+}
+
+render();
+</script>
